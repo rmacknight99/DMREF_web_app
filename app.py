@@ -1,8 +1,12 @@
 import streamlit as st
+import numpy as np
 import pandas as pd
+from sklearn.preprocessing import StandardScaler 
+from sklearn.metrics import accuracy_score
+from sklearn.datasets import load_wine
+from sklearn.decomposition import PCA
+import plotly.graph_objects as go
 
-st.write("Here's our first attempt at using data to create a table:")
-st.write(pd.DataFrame({
-    'first column': [1, 2, 3, 4],
-    'second column': [10, 20, 30, 40]
-}))
+
+# Title
+st.title("PCA applied to Chemical Space of Amine Salts")
