@@ -11,6 +11,40 @@ import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
+import molplotly
+from bokeh.plotting import ColumnDataSource, figure, output_file, show
+from rdkit.Chem import AllChem as Chem
+from rdkit.Chem import Draw
+from io import BytesIO, StringIO
+import base64
+
+def get_svg_str(smiles, svg_size=200):
+    d2d = Draw.rdMolDraw2D.MolDraw2DSVG(svg_size*2, svg_size)
+    opts = d2d.drawOptions()
+    opts.clearBackground = False
+    d2d.DrawMolecule(Chem.MolFromSmiles(smiles))
+    d2d.FinishDrawing()
+    img_str = d2d.GetDrawingText()
+    buffered = BytesIO()
+    buffered.write(str.encode(img_str))
+    img_str = base64.b64encode(buffered.getvalue())
+    img_str = "data:image/svg+xml;base64,{}".format(repr(img_str)[2:-1])
+    return img_str
+
+def plot_with_hover(pcas_df, ifs, df_in, exp_var, imgs):
+
+    print(len(list(set(imgs))))
+    imgs = [get_svg_str(img) for img in imgs]
+    source = ColumnDataSource(data=dict(x=pcas_df["PC1"], y=pcas_df["PC2"], z=pcas_df["PC3"], imgs=imgs))
+    TOOLTIPS = """<img
+                   src="@imgs" height="200" alt="@imgs" width="400"
+                   style="float: left; margin: 0px 15px 15px 0px;"
+                   border="2"
+            ></img>"""
+    p = figure(width=800, height=400, title=r"delta G v.s. delta H", tooltips=TOOLTIPS,
+               x_axis_label=r"$$\Delta H (kcal/mol)$$", y_axis_label=r"$$\Delta G(kcal/mol)$$")
+    p.scatter(x="x", y="y", source=source)
+    return p
 
 def gen_single_figure(size=(20, 9), nrows=2, ncols=7):
 
@@ -95,7 +129,7 @@ def run_PCA(in_array, cols, n_components, pca=None):
             ifs["PC"+f"{i+1}"] = d
         return pcas_df, exp_var, ifs, pca
 
-def pca_3d(pcas_df, ifs, df_in, exp_var, label="PC1", color_by_dataset=None):
+def pca_3d(pcas_df, ifs, df_in, exp_var, label="PC1", smiles_df=None, color_by_dataset=None):
 
     if color_by_dataset is not None:
         color_label = color_by_dataset
@@ -133,6 +167,10 @@ def pca_3d(pcas_df, ifs, df_in, exp_var, label="PC1", color_by_dataset=None):
                         legend=dict(groupclick="toggleitem"))
     else:
         color_label = list(ifs[label].keys())[0]
+        #if smiles_df is not None:
+        #    hover_data = smiles_df["SMILES"]
+        #else:
+        #    hover_data = None
         fig = go.Figure(data=[go.Scatter3d(
         x=pcas_df["PC1"],
         y=pcas_df["PC2"],
@@ -144,16 +182,43 @@ def pca_3d(pcas_df, ifs, df_in, exp_var, label="PC1", color_by_dataset=None):
             colorscale='solar',
             opacity=0.8, colorbar=dict(lenmode='fraction', len=0.75, thickness=20, title=f"{', '.join(list(ifs[label].keys()))}")
         ))])
-        x_lbl = f"PC1 {', '.join(list(ifs['PC1'].keys()))}"
-        y_lbl = f"PC2 {', '.join(list(ifs['PC2'].keys()))}"
-        z_lbl = f"PC3 {', '.join(list(ifs['PC3'].keys()))}"
+        pc1 = [e + f' <b>IF #{i+1}</b><br>' for i, e in enumerate(list(ifs['PC1'].keys()))]
+        pc2 = [e + f' <b>IF #{i+1}</b><br>' for i, e in enumerate(list(ifs['PC2'].keys()))]
+        pc3 = [e + f' <b>IF #{i+1}</b><br>' for i, e in enumerate(list(ifs['PC3'].keys()))]
+        x_lbl = f"PC1<br>{''.join(pc1)}"
+        y_lbl = f"PC2<br>{''.join(pc2)}"
+        z_lbl = f"PC3<br>{''.join(pc3)}"
         # tight layout
-        fig.update_layout(title={"text":f"\n\n\n\n\n\nPrincipal Component Analysis Explained Variance  = {round(np.sum(exp_var), 2)*100}%"},
-                        scene=dict(xaxis_title = x_lbl,
-                        yaxis_title = y_lbl,
-                        zaxis_title = z_lbl),
-                        width=500,
-                        height=700,
-                        margin=dict(l=10, r=10, b=10, t=30),
+
+        fig.update_layout(title={"text":f"<b>Principal Component Analysis Explained Variance  = {round(np.sum(exp_var), 2)*100}%</b>", 'xanchor': 'center', 'yanchor': 'top', 
+                                 "font":dict(
+                                            size=32,
+                                            color='#000000'
+                                        )},
+                          scene=dict(
+                                    xaxis = dict(
+                                        backgroundcolor="rgb(230, 230, 200)",
+                                        gridcolor="white",
+                                        showbackground=True,
+                                        zerolinecolor="white",),
+                                    yaxis = dict(
+                                        backgroundcolor="rgb(230, 230, 200)",
+                                        gridcolor="white",
+                                        showbackground=True,
+                                        zerolinecolor="white"),
+                                    zaxis = dict(
+                                        backgroundcolor="rgb(230, 230, 200)",
+                                        gridcolor="white",
+                                        showbackground=True,
+                                        zerolinecolor="white",),
+                                    xaxis_title=x_lbl,
+                                    yaxis_title=y_lbl,
+                                    zaxis_title=z_lbl
+                                        ),
+                          width=500,
+                          height=700,
+                          margin=dict(l=40, r=40, b=10, t=40),
+                          font=dict(family="helvetica", size=16)
                         )
+
     return fig
