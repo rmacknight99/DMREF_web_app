@@ -1,148 +1,116 @@
-import streamlit as st
-import numpy as np
-import pandas as pd
-from sklearn.preprocessing import StandardScaler 
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.metrics import accuracy_score
-from sklearn.datasets import load_wine
-from sklearn.decomposition import PCA
-import plotly.graph_objects as go
-import matplotlib
-matplotlib.use('agg')
-import matplotlib.pyplot as plt
-import plotly.graph_objects as go
+from app_utils import *
+#from pca_utils import *
+from desc_utils import *
 
-def gen_single_figure(size=(20, 9), nrows=2, ncols=7):
+import sys
 
-    fig, axs = plt.subplots(figsize=size, nrows=nrows, ncols=ncols)
-    for ax in axs.reshape(-1):
-        ax.grid(True, linewidth=1.0, color='0.95')
-        ax.spines['right'].set_visible(False)
-        ax.spines['top'].set_visible(False)
-        ax.set_axisbelow(True)
-        for axis in ['bottom', 'left']:
-            ax.spines[axis].set_linewidth(2.5)
-        for tick in ax.get_yticklabels():
-            tick.set_fontname("Arial")
-            tick.set_fontsize(12)
-        for tick in ax.get_xticklabels():
-            tick.set_fontname("Arial")
-            tick.set_fontsize(12)
-    
-    return fig, axs
-
-def load_descriptors(in_file):
-
-    descriptors = pd.read_csv(in_file)
-    return descriptors, descriptors.columns
-
-def min_max_scale(df):
-
-    scaler = MinMaxScaler()
-    df_scaled = scaler.fit_transform(df)
-    df_scaled = pd.DataFrame(df_scaled, columns=df.columns)
-    return df_scaled
-
-def std_scale(df):
-
-    scaler = StandardScaler()
-    df_scaled = scaler.fit_transform(df)
-    df_scaled = pd.DataFrame(df_scaled, columns=df.columns)
-    return df_scaled
-
-def histogram(df, size=(20, 9), bins=20, nrows=2, ncols=7):
-
-    fig, axs = gen_single_figure()
-    cols = df.columns
-    for i, ax in enumerate(axs.reshape(-1)):
-        try:
-            d = cols[i]
-            data = df[d].tolist()
-            ax.hist(data, color="lightsalmon", bins=bins)
-            ax.set_ylabel("Frequency of Descriptor Bin", fontsize=10)
-            ax.set_xlabel(f"Scaled Descriptor Value\n`{cols[i]}`", fontsize=10)
-            ax.set_title(f"Distribution of Scaled\n`{cols[i]}` Values", fontsize=10)
-        except:
-            pass
-    return fig, axs
-
-def run_PCA(in_array, cols, n_components):
-    pca = PCA(n_components=n_components)
-    pcas = pca.fit_transform(in_array)
-    pcas_df = pd.DataFrame(pcas, columns=["PC"+f"{i+1}" for i in range(n_components)])
-    exp_var = pca.explained_variance_ratio_
-    ifs = {"PC"+f"{i+1}": [] for i in range(n_components)}
-    for i in range(n_components):
-        pca_components = np.abs(pca.components_[i,:])
-        indices = pca_components.argsort()
-        descriptors = np.flip(np.asarray(cols)[indices])
-        sorted_components = pca_components[indices]
-        sum_components = np.sum(sorted_components)
-        normalized_components = sorted_components / sum_components
-        flipped = np.flip(normalized_components)
-        d = {}
-        for index, c in enumerate(flipped[:2]):
-            d[descriptors[index]] = str(round(c, 2)*100) + "%"
-        ifs["PC"+f"{i+1}"] = d
-
-    return pcas_df, exp_var, ifs
-
-def pca_3d(pcas_df, ifs, df_in, exp_var, label="PC1"):
-
-    color_label = list(ifs[label].keys())[0]
-    fig = go.Figure(data=[go.Scatter3d(
-    x=pcas_df["PC1"],
-    y=pcas_df["PC2"],
-    z=pcas_df["PC3"],
-    mode='markers',
-    marker=dict(
-        size=12,
-        color=df_in[color_label],
-        colorscale='solar',
-        opacity=0.8, colorbar=dict(lenmode='fraction', len=0.75, thickness=20)
-    ))])
-    x_lbl = f"PC1"
-    y_lbl = f"PC2"
-    z_lbl = f"PC3"
-    # tight layout
-    fig.update_layout(title={"text":f"Principal Component Analysis<br>Explained Variance  = {round(np.sum(exp_var), 2)*100}%"},
-                    scene=dict(xaxis_title = x_lbl,
-                    yaxis_title = y_lbl,
-                    zaxis_title = z_lbl),
-                    width=700,
-                    margin=dict(l=20, r=20, b=20, t=40),
-                    )
-    return fig
-
-# Title
-st.title("PCA on MORFEUS Descriptors for Chemical Space of Amine Salts")
-df, cols = load_descriptors("descriptors_ORCA_13.csv")
-df_std_scaled = std_scale(df)
-df_mm_scaled = min_max_scale(df)
-if st.button("View Raw Data"):
-    if st.checkbox("Show raw descriptor data"):
-        st.dataframe(df)
-    if st.checkbox("Show standard scaled descriptor data"):
+def main(original_file, stoned_file):
+    # Title
+    st. set_page_config(layout="wide")
+    st.title("PCA on MORFEUS Descriptors for Chemical Space of Amine Salts")
+    input_ = st.text_input("Enter SMILES,NAME")
+    if input_ != "":
+        i = 1
+        SMILES, NAME = input_.split(",")[0], input_.split(",")[1]
+        if ".[Cl-]" not in SMILES:
+            SMILES += ".[Cl-]"
+            pipeline(SMILES, NAME, cores=8, n_atoms=len(Chem.MolFromSmiles(SMILES).GetAtoms()), charge=0, multiplicity=1)
+            with_ce, _, __ = make_best_ensemble(path_with=NAME)
+            print(f"\tInitial Ensemble Size: {with_ce.n_conformers}", flush=True)
+            # Prune ensemble
+            if with_ce.n_conformers > 100:
+                rmsd_thresh = 2.0
+                energy_thresh = 1.0
+            else:
+                rmsd_thresh = 0.5
+                energy_thresh = 2.0
+            with_ce = trim_conformers(with_ce, rmsd_thresh=rmsd_thresh, energy_thresh=energy_thresh)
+            print(f"\tPruned Ensemble Size: {with_ce.n_conformers}", flush=True)
+            # Dump conformers
+            dump_conformers(NAME, with_ce, i)
+    df, cols = load_descriptors(original_file)
+    df_std_scaled, std_scaler = std_scale(df)
+    df_mm_scaled, mm_scaler = min_max_scale(df)
+    raw_data = st.button("Raw Data")
+    std_scale_data = st.button("Standardize Data")
+    min_scale_data = st.button("MinMax Scale Data")
+    stoned_df, cols = load_descriptors(stoned_file)
+    stoned_std_df_scaled, std_scaler = std_scale(stoned_df, std_scaler)
+    stoned_mm_df_scaled, mm_scaler = std_scale(stoned_df, mm_scaler)
+    if raw_data:
+        tab1, tab2 = st.tabs(["Original Data", "Original + STONED"])
+        with tab1:
+            st.dataframe(df)
+            fig, _ = histogram(df, bins=20, size=(10, 10))
+            fig.tight_layout()
+            st.pyplot(fig=fig)
+        with tab2:
+            st.dataframe(stoned_df)
+            fig, _ = histogram(stoned_df, bins=20, size=(10, 10))
+            fig.tight_layout()
+            st.pyplot(fig=fig)
+    if std_scale_data:
         st.dataframe(df_std_scaled)
-    if st.checkbox("Show distributions for standard scaled descriptor values"):
-        fig, axs = histogram(df_std_scaled, bins=20, size=(10, 10))
-        fig.tight_layout()
-        st.pyplot(fig=fig)
-    if st.checkbox("Show min max scaled descriptor data"):
+        tab1, tab2 = st.tabs(["Original Data", "Original + STONED"])
+        with tab1:
+            fig, _ = histogram(df_std_scaled, bins=20, size=(10, 10))
+            fig.tight_layout()
+            st.pyplot(fig=fig)
+        with tab2:
+            fig, _ = histogram(pd.concat([df_std_scaled, stoned_std_df_scaled]))
+            fig.tight_layout()
+            st.pyplot(fig=fig)
+    if min_scale_data:
         st.dataframe(df_mm_scaled)
-    if st.checkbox("Show distributions for min max scaled descriptor values"):
-        fig, axs = histogram(df_mm_scaled, bins=20, size=(10, 10))
-        fig.tight_layout()
-        st.pyplot(fig=fig)
-elif st.button("View PCA on Standard Scaled Data"):
-    pcas_df, exp_var, ifs = run_PCA(df_std_scaled, cols, 3)
-    fig = pca_3d(pcas_df, ifs, df, exp_var, label="PC1")
-    st.plotly_chart(fig, theme=None)
-    fig = pca_3d(pcas_df, ifs, df, exp_var, label="PC2")
-    st.plotly_chart(fig, theme=None)
-    fig = pca_3d(pcas_df, ifs, df, exp_var, label="PC3")
-    st.plotly_chart(fig, theme=None)
-elif st.button("View PCA on MinMax Scaled Data"):
-    pcas_df, exp_var, ifs = run_PCA(df_mm_scaled, cols, 3)
-    fig = pca_3d(pcas_df, ifs, df, exp_var)
-    st.plotly_chart(fig, theme=None)
+        tab1, tab2 = st.tabs(["Original Data", "Original + STONED"])
+        with tab1:
+            fig, _ = histogram(df_mm_scaled, bins=20, size=(10, 10))
+            fig.tight_layout()
+            st.pyplot(fig=fig)
+        with tab2:
+            fig, _ = histogram(pd.concat([df_mm_scaled, stoned_mm_df_scaled]), bins=20, size=(10, 10))
+            fig.tight_layout()
+            st.pyplot(fig=fig)
+    if st.button("View PCA on Standard Scaled Data"):
+        tab1, tab2 = st.tabs(["Original Data", "Original + STONED"])
+        with tab1:
+            pca1, pca2, pca3 = st.tabs(["PC1", "PC2", "PC3"])
+            pcas_df, exp_var, ifs, pca = run_PCA(df_std_scaled, cols, 3)
+            with pca1:
+                fig_1 = pca_3d(pcas_df, ifs, df, exp_var, label="PC1")
+                st.plotly_chart(fig_1, theme=None, use_container_width=True)
+            with pca2:
+                fig_2 = pca_3d(pcas_df, ifs, df, exp_var, label="PC2")
+                st.plotly_chart(fig_2, theme=None, use_container_width=True)
+            with pca3:
+                fig_3 = pca_3d(pcas_df, ifs, df, exp_var, label="PC3")
+                st.plotly_chart(fig_3, theme=None, use_container_width=True)
+        with tab2:
+            stoned_df, cols = load_descriptors(stoned_file)
+            stoned_df_scaled, std_scaler = std_scale(stoned_df, std_scaler)
+            stoned_pcas_df = run_PCA(stoned_df_scaled, cols, 3, pca)
+            fig_1 = pca_3d(pcas_df, ifs, df, exp_var, label="PC1", color_by_dataset=stoned_pcas_df)
+            st.plotly_chart(fig_1, theme=None, use_container_width=True)
+    if st.button("View PCA on MinMax Scaled Data"):
+        tab1, tab2 = st.tabs(["Original Data", "Original + STONED"])
+        with tab1:
+            pca1, pca2, pca3 = st.tabs(["PC1", "PC2", "PC3"])
+            pcas_df, exp_var, ifs, pca = run_PCA(df_mm_scaled, cols, 3)
+            with pca1:
+                fig_1 = pca_3d(pcas_df, ifs, df, exp_var, label="PC1")
+                st.plotly_chart(fig_1, theme=None, use_container_width=True)
+            with pca2:
+                fig_2 = pca_3d(pcas_df, ifs, df, exp_var, label="PC2")
+                st.plotly_chart(fig_2, theme=None, use_container_width=True)
+            with pca3:
+                fig_3 = pca_3d(pcas_df, ifs, df, exp_var, label="PC3")
+                st.plotly_chart(fig_3, theme=None, use_container_width=True)
+        with tab2:
+            stoned_df, cols = load_descriptors(stoned_file)
+            dataset = ["blue" for _ in range(df.shape[0])] + ["red" for _ in range(stoned_df.shape[0])]
+            stoned_df_scaled, mm_scaler = std_scale(stoned_df, mm_scaler)
+            stoned_pcas_df = run_PCA(stoned_df_scaled, cols, 3, pca)
+            fig_1 = pca_3d(pcas_df, ifs, df, exp_var, label="PC1", color_by_dataset=stoned_pcas_df)
+            st.plotly_chart(fig_1, theme=None, use_container_width=True)
+
+main(sys.argv[1], sys.argv[2])
