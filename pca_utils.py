@@ -1,9 +1,6 @@
-AAimport os, shutil
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler 
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.metrics import accuracy_score
-from sklearn.datasets import load_wine
 from sklearn.decomposition import PCA
 import pandas as pd
 import numpy as np

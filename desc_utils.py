@@ -1,4 +1,4 @@
-import os, json, sys, shutil
+import os, shutil
 import pandas as pd
 import numpy as np
 from morfeus import conformer, Dispersion, read_xyz, XTB, LocalForce, SASA, utils

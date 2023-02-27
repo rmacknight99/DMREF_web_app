@@ -1,21 +1,17 @@
-import streamlit as st
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler 
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.metrics import accuracy_score
-from sklearn.datasets import load_wine
 from sklearn.decomposition import PCA
 import plotly.graph_objects as go
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
-import molplotly
-from bokeh.plotting import ColumnDataSource, figure, output_file, show
+from bokeh.plotting import ColumnDataSource, figure
 from rdkit.Chem import AllChem as Chem
 from rdkit.Chem import Draw
-from io import BytesIO, StringIO
+from io import BytesIO
 import base64
 
 def get_svg_str(smiles, svg_size=200):
@@ -153,14 +149,34 @@ def pca_3d(pcas_df, ifs, df_in, exp_var, label="PC1", smiles_df=None, color_by_d
         color="red",
         size=12        
         )))
-        x_lbl = f"PC1"
-        y_lbl = f"PC2"
-        z_lbl = f"PC3"
+        #x_lbl = f"PC1"
+        #y_lbl = f"PC2"
+        #z_lbl = f"PC3"
+        x_lbl = ""
+        y_lbl = ""
+        z_lbl = ""
         # tight layout
-        fig.update_layout(title={"text":f"\n\n\n\n\n\nPrincipal Component Analysis Explained Variance  = {round(np.sum(exp_var), 2)*100}%"},
-                        scene=dict(xaxis_title = x_lbl,
-                        yaxis_title = y_lbl,
-                        zaxis_title = z_lbl),
+        fig.update_layout(title={"text":f"Principal Component Analysis Explained Variance  = {round(np.sum(exp_var), 2)*100}%"},
+                        scene=dict(
+                                    xaxis = dict(
+                                        backgroundcolor="rgb(230, 230, 200)",
+                                        gridcolor="white",
+                                        showbackground=True,
+                                        zerolinecolor="white",),
+                                    yaxis = dict(
+                                        backgroundcolor="rgb(230, 230, 200)",
+                                        gridcolor="white",
+                                        showbackground=True,
+                                        zerolinecolor="white"),
+                                    zaxis = dict(
+                                        backgroundcolor="rgb(230, 230, 200)",
+                                        gridcolor="white",
+                                        showbackground=True,
+                                        zerolinecolor="white",),
+                                    xaxis_title=x_lbl,
+                                    yaxis_title=y_lbl,
+                                    zaxis_title=z_lbl
+                                        ),
                         width=500,
                         height=700,
                         margin=dict(l=10, r=10, b=10, t=30),
@@ -186,6 +202,9 @@ def pca_3d(pcas_df, ifs, df_in, exp_var, label="PC1", smiles_df=None, color_by_d
         pc2 = [e + f' <b>IF #{i+1}</b><br>' for i, e in enumerate(list(ifs['PC2'].keys()))]
         pc3 = [e + f' <b>IF #{i+1}</b><br>' for i, e in enumerate(list(ifs['PC3'].keys()))]
         x_lbl = f"PC1<br>{''.join(pc1)}"
+        #x_lbl = ""
+        #y_lbl = ""
+        #z_lbl = ""
         y_lbl = f"PC2<br>{''.join(pc2)}"
         z_lbl = f"PC3<br>{''.join(pc3)}"
         # tight layout
