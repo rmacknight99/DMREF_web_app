@@ -4,6 +4,10 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.decomposition import PCA
 import pandas as pd
 import numpy as np
+from rdkit.Chem import Draw
+from rdkit import Chem
+from io import BytesIO
+import base64
 
 def gen_single_figure(size=(20, 9), nrows=2, ncols=7):
 
@@ -106,3 +110,24 @@ def pca_3d(pcas_df, ifs, df_in, exp_var, label="PC1"):
                     margin=dict(l=20, r=20, b=20, t=40),
                     )
     return fig
+
+def get_svg_str(smiles, svg_size=200):
+    m = Chem.AllChem.MolFromSmiles(smiles, useSmiles=True)
+    d2d = Draw.rdMolDraw2D.MolDraw2DSVG(svg_size*2, svg_size)
+    opts = d2d.drawOptions()
+    opts.clearBackground = False
+    d2d.DrawMol(m)
+    d2d.FinishDrawing()
+    img_str = d2d.GetDrawingText()
+    buffered = BytesIO()
+    buffered.write(str.encode(img_str))
+    img_str = base64.b64encode(buffered.getvalue())
+    img_str = "data:image/svg+xml;base64,{}".format(repr(img_str)[2:-1])
+    return img_str
+
+def scale_data(df, cols, std_scaler=None, min_max_scaler=None):
+    
+    smiles = df["SMILES"].tolist()
+    data_df = df.drop("SMILES", axis=1)
+    df_std_scaled, std_scaler = std_scale(data_df)
+    df_mm_scaled, mm_scaler = min_max_scale(data_df)

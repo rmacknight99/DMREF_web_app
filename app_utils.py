@@ -82,6 +82,21 @@ def std_scale(df, scaler=None):
     df_scaled = pd.DataFrame(df_scaled, columns=df.columns)
     return df_scaled, scaler
 
+def scale_data(df, std_scaler=None, min_max_scaler=None):
+    
+    df = df.dropna()
+    smiles = df["SMILES"].tolist()
+    data_df = df.drop("SMILES", axis=1)
+    df_std_scaled, std_scaler = std_scale(data_df, scaler=std_scaler)
+    df_mm_scaled, mm_scaler = min_max_scale(data_df, scaler=min_max_scaler)
+    data_dict = {"smiles": smiles, 
+                 "original data": df, 
+                 "std scaled data": df_std_scaled, 
+                 "mm scaled data": df_mm_scaled, 
+                 "scalers": {"std": std_scaler, "mm": mm_scaler}
+                 }
+    return data_dict
+
 def histogram(df, size=(20, 9), bins=20, nrows=2, ncols=7):
 
     fig, axs = gen_single_figure()
@@ -90,6 +105,7 @@ def histogram(df, size=(20, 9), bins=20, nrows=2, ncols=7):
         try:
             d = cols[i]
             data = df[d].tolist()
+            float(data[0])
             ax.hist(data, color="lightsalmon", bins=bins)
             ax.set_ylabel("Frequency of Descriptor Bin", fontsize=10)
             ax.set_xlabel(f"Scaled Descriptor Value\n`{cols[i]}`", fontsize=10)
@@ -125,7 +141,7 @@ def run_PCA(in_array, cols, n_components, pca=None):
             ifs["PC"+f"{i+1}"] = d
         return pcas_df, exp_var, ifs, pca
 
-def pca_3d(pcas_df, ifs, df_in, exp_var, label="PC1", smiles_df=None, color_by_dataset=None):
+def pca_3d(pcas_df, ifs, df_in, exp_var, label="PC1", color_by_dataset=None):
 
     if color_by_dataset is not None:
         color_label = color_by_dataset
@@ -149,12 +165,12 @@ def pca_3d(pcas_df, ifs, df_in, exp_var, label="PC1", smiles_df=None, color_by_d
         color="red",
         size=12        
         )))
-        #x_lbl = f"PC1"
-        #y_lbl = f"PC2"
-        #z_lbl = f"PC3"
-        x_lbl = ""
-        y_lbl = ""
-        z_lbl = ""
+        x_lbl = f"PC1"
+        y_lbl = f"PC2"
+        z_lbl = f"PC3"
+        #x_lbl = ""
+        #y_lbl = ""
+        #z_lbl = ""
         # tight layout
         fig.update_layout(title={"text":f"Principal Component Analysis Explained Variance  = {round(np.sum(exp_var), 2)*100}%"},
                         scene=dict(
@@ -196,17 +212,17 @@ def pca_3d(pcas_df, ifs, df_in, exp_var, label="PC1", smiles_df=None, color_by_d
             size=12,
             color=df_in[color_label],
             colorscale='solar',
-            opacity=0.8, colorbar=dict(lenmode='fraction', len=0.75, thickness=20, title=f"{', '.join(list(ifs[label].keys()))}")
+            opacity=0.8, colorbar=dict(lenmode='fraction', len=0.75, thickness=20, title=f"{list(ifs[label].keys())[0]}")
         ))])
         pc1 = [e + f' <b>IF #{i+1}</b><br>' for i, e in enumerate(list(ifs['PC1'].keys()))]
         pc2 = [e + f' <b>IF #{i+1}</b><br>' for i, e in enumerate(list(ifs['PC2'].keys()))]
         pc3 = [e + f' <b>IF #{i+1}</b><br>' for i, e in enumerate(list(ifs['PC3'].keys()))]
-        x_lbl = f"PC1<br>{''.join(pc1)}"
+        x_lbl = f"PC1"
         #x_lbl = ""
         #y_lbl = ""
         #z_lbl = ""
-        y_lbl = f"PC2<br>{''.join(pc2)}"
-        z_lbl = f"PC3<br>{''.join(pc3)}"
+        y_lbl = f"PC2"
+        z_lbl = f"PC3"
         # tight layout
 
         fig.update_layout(title={"text":f"<b>Principal Component Analysis Explained Variance  = {round(np.sum(exp_var), 2)*100}%</b>", 'xanchor': 'center', 'yanchor': 'top', 

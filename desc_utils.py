@@ -19,7 +19,7 @@ def gen_crest(xyz_files, out_files):
     col_1 = 0 # initialize cumulative sum
     col_2 = 0 # initialize cumulative sum
     for i, xyz_file in enumerate(xyz_files):
-        with open(xyz_file, "r") as f: # open xyz files
+        with open(xyz_file, "r") as f: # open xyz file
             lines = f.readlines()
             num_atoms = lines[0] # first line as number of atoms
         with open(out_files[i], "r") as orca_out: # open orca output
